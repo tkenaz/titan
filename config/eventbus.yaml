@@ -1,0 +1,40 @@
+redis:
+  url: "redis://:titan_secret_2025@redis-master:6379/0"
+  pool_size: 20
+
+streams:
+  - name: "chat.v1"
+    maxlen: 1000000
+    rate_limit: 200
+    retry_limit: 5
+  
+  - name: "fs.v1"
+    maxlen: 500000
+    rate_limit: 50
+    retry_limit: 3
+  
+  - name: "system.v1"
+    maxlen: 100000
+    rate_limit: 100
+    retry_limit: 5
+  
+  - name: "plugin.v1"
+    maxlen: 200000
+    rate_limit: 150
+    retry_limit: 4
+
+priority_weights:
+  high: 3
+  medium: 2
+  low: 1
+
+# Global settings
+batch_size: 100
+block_timeout: 2000
+consumer_group: "titan-core"
+dead_letter_stream: "errors.dlq"
+max_global_rate: 1000
+
+# Observability
+metrics_port: 8000
+trace_sample_rate: 0.1

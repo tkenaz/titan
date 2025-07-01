@@ -1,0 +1,128 @@
+services:
+  redis-master:
+    image: redis:7-alpine
+    container_name: titan-redis-master
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync always
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --requirepass titan_secret_2025
+    volumes:
+      - redis-data:/data
+    networks:
+      - titan-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "titan_secret_2025", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: titan-redis-replica
+    ports:
+      - "6380:6379"
+    command: >
+      redis-server
+      --replicaof redis-master 6379
+      --masterauth titan_secret_2025
+      --requirepass titan_secret_2025
+      --appendonly yes
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - titan-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "titan_secret_2025", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-sentinel:
+    image: redis:7-alpine
+    container_name: titan-redis-sentinel
+    ports:
+      - "26379:26379"
+    command: redis-sentinel /etc/redis-sentinel/sentinel.conf
+    volumes:
+      - ./config/sentinel.conf:/etc/redis-sentinel/sentinel.conf
+    depends_on:
+      - redis-master
+      - redis-replica
+    networks:
+      - titan-network
+
+  titan-eventbus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: titan-eventbus
+    environment:
+      - REDIS_URL=redis://:titan_secret_2025@redis-master:6379/0
+      - PYTHONUNBUFFERED=1
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    networks:
+      - titan-network
+    volumes:
+      - ./titan_bus:/app/titan_bus
+      - ./config:/app/config
+      - ./logs:/app/logs
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: titan-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - titan-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: titan-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - titan-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: titan-jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - titan-network
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  titan-network:
+    driver: bridge

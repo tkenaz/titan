@@ -1,0 +1,272 @@
+Техзадание: Локальный десктоп‑клиент “ChatGPT Local”
+
+(рабочее название, поменяем при желании)
+
+1. Цель
+
+Создать автономный десктоп‑клиент, который даёт ChatGPT:
+	1.	Доступ к локальной памяти (Redis / PgVector / Neo4j).
+	2.	Работу с локальными файлами в каталогах Desktop и Downloads.
+	3.	Чат‑интерфейс с “живым” контекстом и быстрой реакцией.
+	4.	Готовый фундамент для самостоятельных действий (автономия, инициативность).
+
+⸻
+
+2. Общее описание системы
+
+┌────────────────────────────┐
+│ Electron UI                │
+│  (React + Tailwind)        │
+└───────────▲────────────────┘
+            │ WebSocket/HTTP
+┌───────────┴────────────────┐
+│ Local API Gateway (FastAPI)│
+│  /api/chat                 │
+│  /api/files                │
+│  /api/memory               │
+└───▲───────┬──────▲─────────┘
+    │       │      │
+    │       │      └───► Neo4j  (graph memory)
+    │       └──────────► PgVector(PostgreSQL) (semantic memory)
+    └───────────────────► Redis  (short‑term / cache)
+
+Все компоненты стартуют в docker‑compose; одним нажатием «Run Local» поднимается весь стек.
+
+⸻
+
+3. Функциональные требования
+
+№	Блок	Требование
+3.1	Чат‑интерфейс	История, markdown‑рендер, быстрый поиск по сообщениям, drag’n’drop файлов.
+3.2	Файловый доступ	Эндпойнты: GET /files?path=, POST /files/upload, GET /files/download, DELETE /files. Ограничение путей строгими allow‑list (Desktop, Downloads).
+3.3	Память	- POST /memory/embeddings (PgVector) - POST /memory/graph (Neo4j) - GET /memory/query (семантический поиск) - TTL‑кеш на Redis для последних N сообщений/команд.
+3.4	Автономные задания	Планировщик (apscheduler) выполняет периодические задачи (обновить эмбеддинги, просканировать новые файлы, self‑reflection).
+3.5	Безопасность	- Все эндпойнты локалхост (127.0.0.1). - JWT c паролем приложения. - Проверка пути на directory traversal.
+3.6	Настройки	JSON‑файл или GUI‑панель: лимиты памяти, пути каталогов, GPT‑ключ и параметры модели.
+3.7	Логи/аудит	Локальный logs/ + просмотр в UI («консоль» вкладка).
+3.8	Обновления	Простейший “Check for update” (GitHub releases).
+3.9	Мульти‑язычность UI	RU / EN переключатель (минимум).
+
+
+⸻
+
+4. Нефункциональные требования
+
+Категория	Требование
+Производительность	<150 мс round‑trip UI → FastAPI при кэш‑хите.
+Установка	Один installer.dmg / setup.exe / AppImage.
+Портативность	macOS (Apple Silicon + Intel), Windows 10+, Linux (GTK).
+Логи	Максимум 50 МБ, ротация.
+Документация	README.md + Swagger‑UI на /docs.
+
+
+⸻
+
+5. Технологический стек
+
+Слой	Технологии
+UI	Electron 28, React 18, Vite, TailwindCSS
+API	Python 3.12, FastAPI, uvicorn
+Память	Redis 7, PostgreSQL 16 + pgvector 0.7.0, Neo4j 5
+Embeddings	OpenAI text-embedding-3-large (параметризировано)
+DevOps	Docker 25, docker‑compose, Makefile, pre‑commit
+
+
+⸻
+
+6. Модули автономии (дополнительные, если “хочу ещё”)
+	1.	Trigger Watcher – следит за файловой системой, пушит события в Redis‑стрим; ChatGPT реагирует.
+	2.	Goal Scheduler – REST /goals (CRUD) + периодический прогон цепочек ReAct‑планов.
+	3.	Self‑Reflection – ежедневный cron‑задача: агрегировать логи, создавать эмбеддинги «дня», писать summary.
+	4.	Plugin Loader – динамическая подгрузка Python‑плагинов из ./plugins, авто‑документация в UI.
+
+(Если решишь, что эти штуки нужны – добавляем в спринт №2.)
+
+⸻
+
+7. Этапы и сроки
+
+Этап	Задачи	Длительность
+0. Kick‑off	Точная спецификация, скопинг, репо	1 день
+1. Базовый API	FastAPI каркас, эндпойнты /chat, /files	3 дня
+2. Память	PgVector + Redis, CRUD, интеграция с /chat	4 дня
+3. Electron UI	Чат‑окно, авторизация, файл‑менеджер	5 дней
+4. Neo4j layer	Графовая память + визуализация связей	3 дня
+5. Безопасность и сборка	JWT, sandbox, installer	3 дня
+Итого MVP	19–20 чистых рабочих дней	
+
+(в реальности с буферами ~4 недели)
+
+⸻
+
+8. Критерии приёмки
+	•	Установка из одного инсталлятора без внешних зависимостей кроме Docker.
+	•	Чат может: читать / писать файлы, извлекать их содержимое в память, отвечать без ошибок.
+	•	Семантический поиск возвращает релевантный файл по вопросу «покажи договор PDF».
+	•	Не просачивается ничего за пределы Desktop и Downloads.
+	•	UI не падает при 10 000+ сообщений истории.
+	•	Все тесты pytest -q зелёные, покрытие > 80 %.
+
+⸻
+
+9. Риски / внимание
+	•	Apple Silicon: следить за образами PostgreSQL/Neo4j arm64.
+	•	Модели‑API: оффлайн‑кеш эмбеддингов или fallback на nomic-embed.
+	•	Объём Neo4j: планируй лимиты/очистку, иначе прожорлив.
+
+⸻
+
+10. Следующие шаги
+	1.	Подтверди или поправь ТЗ.
+	2.	Заводим приватный GitHub repo (chatgpt‑local).
+	3.	Кидаю базовый docker‑compose.yml + каркас FastAPI.
+	4.	Разбиваем задачи в Jira и в бой.
+
+Если захочется ещё больше автономии, скажи – расширим модуль Goal Scheduler до полноценного агента‑ассистента.
+
+СДЕЛАНО
+Приоритет #1 — Event Bus / Event‑Driven Core
+
+(без устойчивого шина‑событий все плагины и планировщики будут «кричать в пустоту»; плагин‑лоадер можно навесить после того, как сообщения гарантированно летают и сохраняются).
+
+Ниже полное ТЗ для Клода: делай код‑генерацию именно по нему.
+
+⸻
+
+0. Цель
+
+Развернуть надёжный, расширяемый Event Bus (Redis Streams + обвязка), который обеспечивает:
+	1.	публикацию/подписку на события всех подсистем Titan (чат, файлы, задачи, плагины);
+	2.	гарантированную доставку (at‑least‑once) с возможностью replay;
+	3.	приоритеты, rate‑limit, dead‑letter;
+	4.	наблюдаемость (metrics, tracing) и минимальный вендор‑lock.
+
+⸻
+
+1. High‑Level Архитектура
+
+┌─────────────┐  XADD        ┌────────────────────┐
+│  Publisher   ├────────────►│   Redis Stream      │
+└─────────────┘               │   topics:*         │
+        ▲                     └────┬───────────────┘
+        │ XACK / XDEL                │ XREADGROUP
+┌───────┴────────┐            ┌──────▼─────────────┐
+│ ConsumerGroup 1│            │  ConsumerGroup 2   │
+│  (Core Logic)  │            │   (Plugins)        │
+└────────────────┘            └────────────────────┘
+
+	•	Topics (chat.v1, fs.v1, system.v1, plugin.v1 …)
+	•	Consumer Group per subsystem — независимый offset.
+	•	Dead‑Letter Stream (errors.dlq) — падают события, не обработанные N раз.
+	•	Snapshot + Replay: каждые 5 минут события бэкапятся в S3; при cold‑start можно «догнать хвост» XREADBLOCK + s3‑replay.
+
+⸻
+
+2. Схема события
+
+{
+  "event_id"       : "01J25T91SA3G7G9F2W3ZVQ7E7N", // ULID
+  "schema_version" : 1,
+  "topic"          : "chat.v1",
+  "event_type"     : "user_message",
+  "timestamp"      : "2025-07-01T06:45:12Z",
+  "payload"        : {
+      "user_id" : "u-123",
+      "text"    : "Привет, Titan!"
+  },
+  "meta": {
+      "priority"     : "medium",   // high | medium | low
+      "retries"      : 0,
+      "trace_id"     : "f792...bae",
+      "source"       : "desktop_app@v0.9.1"
+  }
+}
+
+	•	Размер события ≤ 32 KB.
+	•	priority влияет на сортировку внутри локальной Priority Queue процессора.
+	•	Поле trace_id переносится в OpenTelemetry span.
+
+⸻
+
+3. Ключевой сервис: Event Processor
+
+3.1 Поведение
+	1.	Pull (XREADGROUP BLOCK 2000 COUNT 100).
+	2.	Сортировка внутри батча по meta.priority (high → low).
+	3.	Rate‑limit — глобально (max msg/s) + per‑topic (конфиг‑YAML).
+	4.	Dispatch каждому зарегистрированному handler‑у (async/await).
+	5.	При успехе — XACK; при ошибке — increment meta.retries; если retries>max_retries → XADD errors.dlq ….
+	6.	События errors.dlq логируются в Grafana alert‑channel.
+
+3.2 Конфиг (YAML)
+
+redis:
+  url: "redis://titan-redis:6379/0"
+streams:
+  - name: "chat.v1"
+    maxlen: 1000000         # trimming to keep Redis RAM < 2 GB
+    rate_limit: 200         # msgs/sec
+    retry_limit: 5
+  - name: "fs.v1"
+    maxlen: 500000
+    rate_limit: 50
+priority_weights:
+  high:   3
+  medium: 2
+  low:    1
+
+
+⸻
+
+4. API‑Контракты (Python package titan_bus)
+
+Функция	Сигнатура	Описание
+publish(topic: str, event_type: str, payload: dict, priority="medium") -> str	ULID	XADD
+subscribe(topic: str, group: str, handler: Callable)	—	Регистрирует async‑handler.
+ack(event_id: str)	—	Явный XACK, если нужно.
+replay(from_timestamp: str, topic: str, to_timestamp: str=None)	AsyncGen	Чтение для восстановления.
+
+* Под капотом — aioredis, но API абстрагирует.
+
+⸻
+
+5. Нефункциональные требования
+	•	Latency:  p99 end‑to‑end ≤ 120 мс (publish → handler complete).
+	•	HA:  Redis in‑cluster, replica + Redis Sentinel.
+	•	Durability: AOF always; RDB snapshot 5 мин; S3 off‑load via redis‑s3‑backup‑cron.
+	•	Security: TLS‑Redis, ACL per service.
+	•	Observability:
+	•	Prometheus exporter (titan_bus_messages_total, titan_bus_processing_latency_ms).
+	•	OpenTelemetry traces (publish, dispatch, handler).
+	•	Language bindings: first‑class Python, thin gRPC shim for other langs (Go‐plugins).
+
+⸻
+
+6. Тест‑кейсы (Mandatory)
+
+№	Сценарий	Проверка
+T1	Publish & consume «chat»	handler получает событие, latency < 120 мс
+T2	Priority ordering	high приходит раньше low в одном батче
+T3	Retry & DLQ	handler кидает Exception × 6 → событие в errors.dlq
+T4	Replay	остановить consumer, накопить 1 к msg, воспроизвести без потерь
+T5	Trim	при maxlen >1 M старые id обрезаются, новые пишутся
+
+
+⸻
+
+7. Deliverables
+	1.	Docker‑compose: redis‑cluster + sentinel + titan_bus service.
+	2.	Python package titan_bus (PEP‑517) c API из §4.
+	3.	Unit‑/Integration‑tests (pytest, 80 % cov).
+	4.	Grafana dashboard.json с готовыми панелями.
+	5.	README.md ≤ 1 стр. Quick‑start.
+
+Deadline (MVP): 3 рабочих дня при 1 dev (Claude).
+
+⸻
+
+Что дальше?
+
+После того как Event Bus стабильно гоняет события → цепляем упрощённый Plugin Loader, регистрируем плагины в топике plugin.v1 и дергаем их из consumer‑group Plugins.
+
+Всё, можно выпускать Клода в прод — пусть клепает код.

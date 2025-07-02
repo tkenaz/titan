@@ -1,0 +1,35 @@
+# Plugin Manager Configuration (Local)
+
+# Paths
+plugins_dir: plugins
+logs_dir: logs/plugins
+
+# Event Bus
+event_bus_url: redis://localhost:6379/0
+consumer_group: plugins
+
+# Sandbox settings
+sandbox:
+  runtime: docker
+  default_cpu: "50m"
+  default_memory: "128Mi"
+  timeout_sec: 60
+  network_mode: none
+  read_only: true
+  no_new_privileges: true
+  drop_capabilities:
+    - ALL
+  tmp_size: "64Mi"
+  work_dir: /workspace
+
+# API settings
+api_host: 0.0.0.0
+api_port: 8003
+
+# Performance
+max_concurrent_plugins: 5
+task_queue_size: 100
+
+# Observability
+metrics_port: 8004
+log_max_lines: 1000

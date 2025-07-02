@@ -50,6 +50,13 @@ class FeatureExtractor:
         r'\b(поменять|изменить|обновить|исправить)\b.*\b(доступ|пароль|права)\b',
     ]
     
+    PLAN_PATTERNS = [
+        r'\b(давай|планируем|встретимся|созвон|встреча|митинг)\b',
+        r'\b(завтра|послезавтра|на следующей неделе|в понедельник)\b.*\b(часов?|утра|вечера)\b',
+        r'\b\d{1,2}[:\-]\d{2}\b.*\b(встреча|созвон|митинг)\b',
+        r'\b(буду|будем|собираюсь|планирую)\b',
+    ]
+    
     CORRECTION_PATTERNS = [
         r'\b(нет|не так|неправильно|ошибка|исправ[ьл]ю)\b',
         r'\b(на самом деле|вообще-то|точнее)\b',
@@ -62,6 +69,7 @@ class FeatureExtractor:
         self.technical_regex = re.compile('|'.join(self.TECHNICAL_PATTERNS), re.IGNORECASE)
         self.temporal_regex = re.compile('|'.join(self.TEMPORAL_PATTERNS), re.IGNORECASE)
         self.urgent_regex = re.compile('|'.join(self.URGENT_PATTERNS), re.IGNORECASE)
+        self.plan_regex = re.compile('|'.join(self.PLAN_PATTERNS), re.IGNORECASE)
         self.correction_regex = re.compile('|'.join(self.CORRECTION_PATTERNS), re.IGNORECASE)
     
     def extract(self, text: str, context: Optional[Dict] = None) -> MemoryFeatures:
@@ -78,6 +86,9 @@ class FeatureExtractor:
         
         # Temporal references
         features.has_temporal = bool(self.temporal_regex.search(text_lower))
+        
+        # Plans detection
+        features.has_plans = bool(self.plan_regex.search(text_lower))
         
         # Urgent/TODO detection
         is_urgent = bool(self.urgent_regex.search(text_lower))
@@ -197,6 +208,9 @@ class MemoryEvaluator:
         if features.has_temporal:
             score += self.weights.temporal
         
+        if features.has_plans:
+            score += self.weights.plans
+        
         if features.emotional_weight > 0:
             score += self.weights.emotional * features.emotional_weight
         
@@ -209,6 +223,7 @@ class MemoryEvaluator:
             self.weights.personal +
             self.weights.technical +
             self.weights.temporal +
+            self.weights.plans +
             self.weights.emotional +
             self.weights.correction
         )

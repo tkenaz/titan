@@ -23,6 +23,7 @@ class ImportanceWeights(BaseModel):
     temporal: float = 0.9
     emotional: float = 0.7
     correction: float = 1.0
+    plans: float = 0.9
 
 
 class MemoryFeatures(BaseModel):
@@ -30,6 +31,7 @@ class MemoryFeatures(BaseModel):
     is_personal: bool = False
     is_technical: bool = False
     has_temporal: bool = False
+    has_plans: bool = False
     emotional_weight: float = 0.0
     is_correction: bool = False
     entities: List[str] = Field(default_factory=list)

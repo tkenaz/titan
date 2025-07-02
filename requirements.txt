@@ -7,6 +7,11 @@ pydantic-settings>=2.1.0
 ulid-py>=1.1.0
 PyYAML>=6.0
 
+# AI/ML dependencies
+openai>=1.12.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+
 # Observability
 prometheus-client>=0.19.0
 opentelemetry-api>=1.22.0
@@ -27,3 +32,4 @@ mypy>=1.8.0
 
 # CLI
 click>=8.1.0
+tabulate>=0.9.0

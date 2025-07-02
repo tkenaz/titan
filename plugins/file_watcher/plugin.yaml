@@ -1,0 +1,33 @@
+name: file_watcher
+version: 0.1.0
+description: Watches for new files and extracts text content
+author: Titan Team
+
+triggers:
+  - topic: fs.v1
+    event_type: file_created
+
+entrypoint: python main.py
+image: python:3.12-slim
+
+requirements:
+  - pdfplumber>=0.10.0
+  - pypdf2>=3.0.0
+
+resources:
+  cpu: "100m"
+  memory: "256Mi"
+
+permissions:
+  fs:
+    allow:
+      - "/Users/mvyshhnyvetska/Downloads/**/*.pdf"
+      - "/Users/mvyshhnyvetska/Downloads/**/*.md"
+      - "/Users/mvyshhnyvetska/Downloads/**/*.txt"
+      - "/Users/mvyshhnyvetska/Desktop/**/*.pdf"
+      - "/Users/mvyshhnyvetska/Desktop/**/*.md"
+      - "/Users/mvyshhnyvetska/Desktop/titan/**"  # Добавим доступ к проекту
+    deny:
+      - "/Users/mvyshhnyvetska/Desktop/private/**"
+
+timeout_sec: 120

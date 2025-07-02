@@ -16,6 +16,15 @@ importance_threshold: 0.5  # Снизили с 0.75
 gc_threshold: 0.25
 embedding_model: text-embedding-3-small
 
+# Importance weights (customizable)
+importance_weights:
+  personal: 1.0
+  technical: 0.9
+  temporal: 0.9
+  emotional: 0.7
+  correction: 1.1
+  plans: 0.9
+
 # API settings
 api_host: 0.0.0.0
 api_port: 8001

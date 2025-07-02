@@ -1,0 +1,28 @@
+# Plugin Manager Service
+
+services:
+  plugin-manager:
+    build:
+      context: .
+      dockerfile: plugin-manager.Dockerfile
+    container_name: titan-plugin-manager
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PLUGIN_EVENT_BUS_URL=redis://:titan_secret_2025@redis-master:6379/0
+    ports:
+      - "8003:8003"  # API
+      - "8004:8004"  # Metrics
+    volumes:
+      - ./plugins:/app/plugins
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for sandbox
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - titan-network
+
+networks:
+  titan-network:
+    external: true

@@ -1,0 +1,28 @@
+name: shell_runner
+version: 0.1.0
+description: Executes whitelisted shell commands safely
+author: Titan Team
+
+triggers:
+  - topic: system.v1
+    event_type: run_cmd
+
+entrypoint: python main.py
+image: python:3.12-slim
+
+resources:
+  cpu: "50m"
+  memory: "128Mi"
+
+permissions:
+  commands:
+    - "ls"
+    - "df"
+    - "uname"
+    - "uptime"
+    - "date"
+    - "pwd"
+    - "whoami"
+    - "echo"
+
+timeout_sec: 30

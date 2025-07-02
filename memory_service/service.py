@@ -32,7 +32,11 @@ class MemoryService:
         
         # Initialize components
         self.embedding_service = EmbeddingService(config)
-        self.evaluator = MemoryEvaluator(config.importance_threshold)
+        
+        # Create ImportanceWeights from config
+        from memory_service.models import ImportanceWeights
+        weights = ImportanceWeights(**config.importance_weights)
+        self.evaluator = MemoryEvaluator(config.importance_threshold, weights)
         
         # Storage backends
         self.vector_storage = VectorStorage(config, self.embedding_service)

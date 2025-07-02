@@ -1,0 +1,4 @@
+для перезапуска
+docker compose -f docker-compose.memory.yml build memory-service
+make memory-down
+make memory-up

@@ -5,6 +5,8 @@ from typing import List, Optional
 import numpy as np
 
 from memory_service.config import MemoryConfig
+import asyncio
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -19,11 +21,12 @@ class EmbeddingService:
         self._client = None
         
         # Initialize OpenAI client if API key provided
-        if config.openai_api_key:
+        api_key = config.openai_api_key or os.getenv('OPENAI_API_KEY')
+        if api_key:
             try:
                 import openai
-                self._client = openai.Client(api_key=config.openai_api_key)
-                logger.info(f"Initialized OpenAI client with model {self.model_name}")
+                self._client = openai.AsyncClient(api_key=api_key)
+                logger.info(f"Initialized OpenAI AsyncClient with model {self.model_name}")
             except ImportError:
                 logger.warning("OpenAI package not installed, using mock embeddings")
     
@@ -31,7 +34,7 @@ class EmbeddingService:
         """Create embedding for text."""
         if self._client:
             try:
-                response = self._client.embeddings.create(
+                response = await self._client.embeddings.create(
                     model=self.model_name,
                     input=text
                 )
@@ -46,7 +49,7 @@ class EmbeddingService:
         """Create embeddings for multiple texts."""
         if self._client and len(texts) <= 100:  # OpenAI batch limit
             try:
-                response = self._client.embeddings.create(
+                response = await self._client.embeddings.create(
                     model=self.model_name,
                     input=texts
                 )

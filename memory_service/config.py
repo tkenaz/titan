@@ -1,7 +1,7 @@
 """Configuration for Memory Service."""
 
 import os
-from typing import Optional
+from typing import Optional, Dict
 import re
 from pathlib import Path
 
@@ -67,6 +67,14 @@ class MemoryConfig(BaseSettings):
     importance_threshold: float = 0.75
     gc_threshold: float = 0.25
     embedding_model: str = "text-embedding-3-small"
+    importance_weights: Dict[str, float] = Field(default_factory=lambda: {
+        "personal": 0.9,
+        "technical": 0.8,
+        "temporal": 0.9,
+        "emotional": 0.7,
+        "correction": 1.0,
+        "plans": 0.9
+    })
     
     # API settings
     api_host: str = "0.0.0.0"
@@ -97,5 +105,7 @@ class MemoryConfig(BaseSettings):
             data["graph_db"] = GraphDBConfig(**data["graph_db"])
         if "redis" in data:
             data["redis"] = RedisConfig(**data["redis"])
+        
+        # importance_weights will be loaded automatically
             
         return cls(**data)

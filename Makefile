@@ -105,3 +105,29 @@ memory-test:
 
 memory-logs:
 	docker compose -f docker-compose.memory.yml logs -f memory-service
+
+# Plugin Manager commands
+plugins-up:
+	docker compose -f docker-compose.yml -f docker-compose.plugins.yml up -d
+	@echo "Plugin Manager starting..."
+	@echo "  - API: http://localhost:8003"
+	@echo "  - Metrics: http://localhost:8004/metrics"
+
+plugins-down:
+	docker compose -f docker-compose.plugins.yml down
+
+plugins-reload:
+	curl -X POST http://localhost:8003/plugins/reload
+
+plugins-list:
+	@python titan-plugins.py list
+
+plugins-logs:
+	docker compose -f docker-compose.plugins.yml logs -f plugin-manager
+
+# All services
+all-up: up memory-up plugins-up
+	@echo "All Titan services started!"
+
+all-down: plugins-down memory-down down
+	@echo "All Titan services stopped."

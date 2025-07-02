@@ -1,18 +1,18 @@
 vector_db:
-  dsn: postgresql://postgres:Frfgekmrj391@127.0.0.1:5432/chatGPT
+  dsn: postgresql://postgres:Frfgekmrj391@host.docker.internal:5432/chatGPT
 
 graph_db:
-  uri: bolt://127.0.0.1:7687
+  uri: bolt://host.docker.internal:7687
   user: neo4j
   password: Frfgekmrj391
 
 redis:
-  url: redis://127.0.0.1:6379/1  # Используем DB 1 для памяти
+  url: redis://host.docker.internal:6379/1  # Используем DB 1 для памяти
   ttl_hours: 24
   max_recent: 200
 
 # Memory evaluation settings
-importance_threshold: 0.75
+importance_threshold: 0.5  # Снизили с 0.75
 gc_threshold: 0.25
 embedding_model: text-embedding-3-small
 

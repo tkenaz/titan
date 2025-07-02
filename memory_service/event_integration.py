@@ -4,7 +4,15 @@ import asyncio
 import logging
 from typing import Dict, Any
 
-from titan_bus import EventBusClient, Event, subscribe
+try:
+    from titan_bus import EventBusClient, Event, subscribe
+    TITAN_BUS_AVAILABLE = True
+except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.warning("titan_bus not available, Event Bus integration disabled")
+    TITAN_BUS_AVAILABLE = False
+    Event = None
+    EventBusClient = None
 from memory_service.config import MemoryConfig
 from memory_service.service import MemoryService
 from memory_service.models import EvaluationRequest
@@ -88,6 +96,10 @@ class MemoryEventBusIntegration:
     
     async def start(self):
         """Start listening to events."""
+        if not TITAN_BUS_AVAILABLE:
+            logger.warning("Titan Bus not available, skipping Event Bus integration")
+            return
+            
         if self._running:
             return
         

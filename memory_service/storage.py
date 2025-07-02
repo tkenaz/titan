@@ -106,17 +106,26 @@ class VectorStorage:
                     logger.info(f"Updated existing memory {existing_id} (similarity: {similar[0][1]:.3f})")
                     return existing_id
             
+            # Convert embedding to PostgreSQL vector format
+            embedding_str = None
+            if entry.embedding:
+                if hasattr(entry.embedding, 'tolist'):
+                    embedding_list = entry.embedding.tolist()
+                else:
+                    embedding_list = entry.embedding
+                embedding_str = '[' + ','.join(map(str, embedding_list)) + ']'
+            
             # Insert new entry
             await conn.execute("""
                 INSERT INTO memory_entries (
                     id, summary, embedding, embedding_model, static_priority,
                     usage_count, last_accessed, created_at, tags, 
                     emotional_weight, source, metadata
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ) VALUES ($1, $2, $3::vector, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             """,
                 entry.id,
                 entry.summary,
-                entry.to_vector_format() if entry.embedding else None,
+                embedding_str,
                 entry.embedding_model,
                 entry.static_priority.value,
                 entry.usage_count,
@@ -211,7 +220,14 @@ class VectorStorage:
         limit: int
     ) -> List[asyncpg.Record]:
         """Find similar entries using vector similarity."""
-        query_vector = np.array(embedding, dtype=np.float32)
+        # Convert to list if numpy array
+        if hasattr(embedding, 'tolist'):
+            embedding_list = embedding.tolist()
+        else:
+            embedding_list = embedding
+            
+        # Convert to PostgreSQL vector format
+        vector_str = '[' + ','.join(map(str, embedding_list)) + ']'
         
         return await conn.fetch("""
             SELECT 
@@ -221,7 +237,7 @@ class VectorStorage:
             WHERE 1 - (embedding <=> $1::vector) > $2
             ORDER BY embedding <=> $1::vector
             LIMIT $3
-        """, query_vector, threshold, limit)
+        """, vector_str, threshold, limit)
     
     async def _row_to_memory(self, row: asyncpg.Record) -> MemoryEntry:
         """Convert database row to MemoryEntry."""

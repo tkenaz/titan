@@ -19,6 +19,7 @@ RUN cd /app/titan_bus && pip install -e .
 
 # Copy memory service
 COPY memory_service /app/memory_service
+COPY memory_service/setup.py /app/setup.py
 COPY config/memory.yaml /app/config/
 
 # Install service

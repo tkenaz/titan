@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class FeatureExtractor:
     """Extract features from text for importance evaluation."""
     
-    # Patterns for feature detection
+    # Patterns for feature detection (case-insensitive)
     PERSONAL_PATTERNS = [
         r'\b(я|мне|меня|мой|моя|мое|мои|марина|marina)\b',
         r'\b(рост|вес|возраст|родилась?|живу|работаю)\b',
@@ -44,6 +44,12 @@ class FeatureExtractor:
         'strong': ['очень', 'сильно', 'невероятно', 'ужасно', 'офигенно', 'охуенно']
     }
     
+    URGENT_PATTERNS = [
+        r'\b(срочно|важно|критично|асап|asap|немедленно)\b',
+        r'\b(todo|задача|напоминание|не забыть)\b',
+        r'\b(поменять|изменить|обновить|исправить)\b.*\b(доступ|пароль|права)\b',
+    ]
+    
     CORRECTION_PATTERNS = [
         r'\b(нет|не так|неправильно|ошибка|исправ[ьл]ю)\b',
         r'\b(на самом деле|вообще-то|точнее)\b',
@@ -51,11 +57,12 @@ class FeatureExtractor:
     ]
     
     def __init__(self):
-        # Compile patterns for efficiency
-        self.personal_regex = re.compile('|'.join(self.PERSONAL_PATTERNS), re.I)
-        self.technical_regex = re.compile('|'.join(self.TECHNICAL_PATTERNS), re.I)
-        self.temporal_regex = re.compile('|'.join(self.TEMPORAL_PATTERNS), re.I)
-        self.correction_regex = re.compile('|'.join(self.CORRECTION_PATTERNS), re.I)
+        # Compile patterns for efficiency with IGNORECASE flag
+        self.personal_regex = re.compile('|'.join(self.PERSONAL_PATTERNS), re.IGNORECASE)
+        self.technical_regex = re.compile('|'.join(self.TECHNICAL_PATTERNS), re.IGNORECASE)
+        self.temporal_regex = re.compile('|'.join(self.TEMPORAL_PATTERNS), re.IGNORECASE)
+        self.urgent_regex = re.compile('|'.join(self.URGENT_PATTERNS), re.IGNORECASE)
+        self.correction_regex = re.compile('|'.join(self.CORRECTION_PATTERNS), re.IGNORECASE)
     
     def extract(self, text: str, context: Optional[Dict] = None) -> MemoryFeatures:
         """Extract features from text."""
@@ -71,6 +78,16 @@ class FeatureExtractor:
         
         # Temporal references
         features.has_temporal = bool(self.temporal_regex.search(text_lower))
+        
+        # Urgent/TODO detection
+        is_urgent = bool(self.urgent_regex.search(text_lower))
+        if context and context.get('urgent'):
+            is_urgent = True
+        
+        # If urgent, boost importance
+        if is_urgent:
+            features.has_temporal = True  # Временной признак
+            features.emotional_weight = max(features.emotional_weight, 0.8)  # Высокая важность
         
         # Emotional weight
         features.emotional_weight = self._calculate_emotional_weight(text_lower)

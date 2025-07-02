@@ -36,6 +36,7 @@ setup(
             "ruff>=0.1.0",
             "mypy>=1.8.0",
         ]
+    },
     entry_points={
         "console_scripts": [
             "titan-bus=titan_bus.cli:main",

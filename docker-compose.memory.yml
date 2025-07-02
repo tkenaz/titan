@@ -13,7 +13,6 @@ services:
     ports:
       - "8001:8001"  # API
       - "8002:8002"  # Metrics
-    network_mode: "host"  # Для доступа к локальным БД
     volumes:
       - ./config:/app/config
       - ./logs:/app/logs

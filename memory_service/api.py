@@ -11,6 +11,7 @@ import time
 
 from memory_service.config import MemoryConfig
 from memory_service.service import MemoryService
+from memory_service.event_integration import MemoryEventBusIntegration
 from memory_service.models import (
     EvaluationRequest,
     EvaluationResponse,
@@ -52,6 +53,7 @@ memory_vector_queries = Counter(
 
 # Global memory service instance
 memory_service: MemoryService = None
+event_integration: MemoryEventBusIntegration = None
 
 
 @asynccontextmanager
@@ -76,9 +78,20 @@ async def lifespan(app: FastAPI):
     await memory_service.connect()
     logger.info("Memory Service started")
     
+    # Initialize Event Bus integration
+    event_integration = MemoryEventBusIntegration(config, memory_service)
+    try:
+        await event_integration.start()
+        logger.info("Event Bus integration started")
+    except Exception as e:
+        logger.warning(f"Event Bus integration failed to start: {e}")
+        # Continue without event integration
+    
     yield
     
     # Cleanup
+    if event_integration:
+        await event_integration.stop()
     await memory_service.disconnect()
     logger.info("Memory Service stopped")
 

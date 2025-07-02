@@ -24,6 +24,7 @@ setup(
         "opentelemetry-sdk>=1.22.0",
         "opentelemetry-instrumentation-redis>=0.44b0",
         "opentelemetry-exporter-otlp>=1.22.0",
+        "click>=8.1.0",
     ],
     extras_require={
         "dev": [
@@ -35,5 +36,9 @@ setup(
             "ruff>=0.1.0",
             "mypy>=1.8.0",
         ]
+    entry_points={
+        "console_scripts": [
+            "titan-bus=titan_bus.cli:main",
+        ],
     },
 )

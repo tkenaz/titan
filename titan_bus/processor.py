@@ -47,6 +47,8 @@ class RateLimiter:
     """Token bucket rate limiter."""
     
     def __init__(self, rate: int, burst: int = None):
+        if rate <= 0:
+            raise ValueError(f"Rate must be positive, got {rate}")
         self.rate = rate
         self.burst = burst or rate
         self.tokens = self.burst
@@ -204,7 +206,7 @@ class EventProcessor:
         # Sort by priority
         sorted_events = sorted(
             events,
-            key=lambda x: self.priority_weights.get(x[1].meta.priority.value, 0),
+            key=lambda x: self.priority_weights.get(x[1].meta.priority.value, 1),  # default weight = 1
             reverse=True
         )
         

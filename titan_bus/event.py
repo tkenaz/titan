@@ -3,6 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
+import re
 
 from pydantic import BaseModel, Field, field_validator
 import ulid
@@ -43,8 +44,8 @@ class Event(BaseModel):
     def validate_topic(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Topic cannot be empty")
-        # Ensure versioned topics
-        if not any(v.endswith(f".v{i}") for i in range(1, 10)):
+        # Ensure versioned topics with proper regex
+        if not re.search(r'\.v\d+$', v):
             raise ValueError(f"Topic must be versioned (e.g., {v}.v1)")
         return v
     

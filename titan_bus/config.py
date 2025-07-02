@@ -1,6 +1,7 @@
 """Configuration for Titan Event Bus."""
 
 from typing import Dict, List, Optional
+import re
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,7 +17,7 @@ class StreamConfig(BaseSettings):
     
     @field_validator("name")
     def validate_versioned_name(cls, v: str) -> str:
-        if not any(v.endswith(f".v{i}") for i in range(1, 10)):
+        if not re.search(r'\.v\d+$', v):
             raise ValueError(f"Stream name must be versioned (e.g., {v}.v1)")
         return v
 

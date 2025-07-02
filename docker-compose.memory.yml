@@ -1,0 +1,20 @@
+# Memory Service (uses existing databases)
+
+services:
+  memory-service:
+    build:
+      context: .
+      dockerfile: memory.Dockerfile
+    container_name: titan-memory-service
+    environment:
+      - MEMORY_CONFIG_PATH=/app/config/memory.yaml
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    ports:
+      - "8001:8001"  # API
+      - "8002:8002"  # Metrics
+    network_mode: "host"  # Для доступа к локальным БД
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./.env:/app/.env

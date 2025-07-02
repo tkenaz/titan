@@ -1,0 +1,29 @@
+vector_db:
+  dsn: postgresql://postgres:Frfgekmrj391@127.0.0.1:5432/chatGPT
+
+graph_db:
+  uri: bolt://127.0.0.1:7687
+  user: neo4j
+  password: Frfgekmrj391
+
+redis:
+  url: redis://127.0.0.1:6379/1  # Используем DB 1 для памяти
+  ttl_hours: 24
+  max_recent: 200
+
+# Memory evaluation settings
+importance_threshold: 0.75
+gc_threshold: 0.25
+embedding_model: text-embedding-3-small
+
+# API settings
+api_host: 0.0.0.0
+api_port: 8001
+
+# Event Bus integration
+event_bus_url: redis://:titan_secret_2025@titan-redis:6379/0
+consumer_group: memory-service
+
+# Observability
+metrics_port: 8002
+trace_sample_rate: 0.1

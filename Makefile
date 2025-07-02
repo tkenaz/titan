@@ -1,4 +1,4 @@
-.PHONY: help build up down test clean logs dev install lint format
+.PHONY: help build up down test clean logs dev install lint format memory-up memory-down memory-test
 
 # Default target
 help:
@@ -13,6 +13,9 @@ help:
 	@echo "  make install  - Install Python dependencies"
 	@echo "  make lint     - Run linters"
 	@echo "  make format   - Format code"
+	@echo "  make memory-up    - Start memory service"
+	@echo "  make memory-down  - Stop memory service"
+	@echo "  make memory-test  - Test memory service"
 
 # Build Docker images
 build:
@@ -86,4 +89,19 @@ check-streams:
 	@docker compose exec redis-master redis-cli -a titan_secret_2025 XLEN fs.v1 || echo "fs.v1: 0"
 	@docker compose exec redis-master redis-cli -a titan_secret_2025 XLEN system.v1 || echo "system.v1: 0"
 	@docker compose exec redis-master redis-cli -a titan_secret_2025 XLEN plugin.v1 || echo "plugin.v1: 0"
-	@docker compose exec redis-master redis-cli -a titan_secret_2025 XLEN errors.dlq || echo "errors.dlq: 0"
+# Memory Service commands
+memory-up:
+	docker compose -f docker-compose.yml -f docker-compose.memory.yml up -d
+	@echo "Memory Service starting..."
+	@echo "  - API: http://localhost:8001"
+	@echo "  - Metrics: http://localhost:8002/metrics"
+	@echo "  - Neo4j: http://localhost:7474 (neo4j/titan_neo4j_2025)"
+
+memory-down:
+	docker compose -f docker-compose.memory.yml down
+
+memory-test:
+	docker compose -f docker-compose.memory.yml run --rm memory-service pytest -v memory_service/tests/
+
+memory-logs:
+	docker compose -f docker-compose.memory.yml logs -f memory-service

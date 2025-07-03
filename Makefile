@@ -1,4 +1,4 @@
-.PHONY: help build up down test clean logs dev install lint format memory-up memory-down memory-test
+.PHONY: help build up down test clean logs dev install lint format memory-up memory-down memory-test scheduler-up scheduler-down scheduler-test
 
 # Default target
 help:
@@ -15,7 +15,9 @@ help:
 	@echo "  make format   - Format code"
 	@echo "  make memory-up    - Start memory service"
 	@echo "  make memory-down  - Stop memory service"
-	@echo "  make memory-test  - Test memory service"
+	@echo "  make scheduler-up    - Start goal scheduler"
+	@echo "  make scheduler-down  - Stop goal scheduler"
+	@echo "  make scheduler-test  - Test goal scheduler"
 
 # Build Docker images
 build:
@@ -125,9 +127,31 @@ plugins-list:
 plugins-logs:
 	docker compose -f docker-compose.plugins.yml logs -f plugin-manager
 
+# Run a specific goal
+
+# Goal Scheduler commands
+scheduler-up:
+	docker compose -f docker-compose.yml -f docker-compose.scheduler.yml up -d
+	@echo "Goal Scheduler starting..."
+	@echo "  - API: http://localhost:8005"
+	@echo "  - Metrics: http://localhost:8006/metrics"
+
+scheduler-down:
+	docker compose -f docker-compose.scheduler.yml down
+
+scheduler-test:
+	@echo "Testing Goal Scheduler..."
+	curl -H "Authorization: Bearer ${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}" http://localhost:8005/goals
+
+scheduler-logs:
+	docker compose -f docker-compose.scheduler.yml logs -f goal-scheduler
+
+scheduler-reload:
+	curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}" http://localhost:8005/goals/reload
+
 # All services
-all-up: up memory-up plugins-up
+all-up: up memory-up plugins-up scheduler-up
 	@echo "All Titan services started!"
 
-all-down: plugins-down memory-down down
+all-down: scheduler-down plugins-down memory-down down
 	@echo "All Titan services stopped."

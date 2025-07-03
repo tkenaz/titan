@@ -1,0 +1,32 @@
+id: test_goal
+name: Test Goal for Development
+schedule: "@every 60s"  # Run every minute for testing
+steps:
+  - id: echo_time
+    type: plugin
+    plugin: echo
+    params:
+      message: "Test goal running at {{ now }}"
+      
+  - id: check_system
+    type: internal
+    params:
+      action: system_check
+      
+  - id: save_result
+    type: bus_event
+    topic: system.v1
+    event_type: test_complete
+    payload_template: |
+      {
+        "goal": "test_goal",
+        "timestamp": "{{ now }}",
+        "echo_result": {{ prev.result | tojson }}
+      }
+      
+retry:
+  attempts: 1
+  backoff_sec: 30
+  
+timeout_sec: 30
+enabled: false  # Disabled by default, enable for testing

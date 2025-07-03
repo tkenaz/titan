@@ -1,0 +1,35 @@
+id: daily_cleanup
+name: Daily System Cleanup
+schedule: "0 2 * * *"  # 2 AM daily
+steps:
+  - id: cleanup_old_containers
+    type: plugin
+    plugin: container_cleanup
+    params:
+      max_age_hours: 24
+      
+  - id: cleanup_old_memories
+    type: internal
+    params:
+      action: cleanup_memories
+      days_old: 30
+      
+  - id: notify_complete
+    type: bus_event
+    topic: system.v1
+    event_type: maintenance_complete
+    payload_template: |
+      {
+        "task": "daily_cleanup",
+        "timestamp": "{{ now }}",
+        "results": {
+          "containers_cleaned": {{ prev.result.containers_cleaned | default(0) }}
+        }
+      }
+      
+retry:
+  attempts: 2
+  backoff_sec: 300
+  
+timeout_sec: 600
+enabled: true

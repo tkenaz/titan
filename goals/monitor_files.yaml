@@ -1,0 +1,43 @@
+id: monitor_files
+name: Monitor Important Files
+triggers:
+  - topic: file.v1
+    event_type: created
+    filter:
+      extension: [pdf, docx, xlsx]
+      
+steps:
+  - id: extract_content
+    type: plugin
+    plugin: file_processor
+    params:
+      file_path: "{{ trigger.event.path }}"
+      action: extract_text
+      
+  - id: save_to_memory
+    type: plugin
+    plugin: memory_saver
+    params:
+      content: "New file {{ trigger.event.filename }}: {{ prev.result.summary }}"
+      importance: 0.8
+      metadata:
+        source: file_monitor
+        file_path: "{{ trigger.event.path }}"
+        
+  - id: notify_processed
+    type: bus_event
+    topic: file.v1
+    event_type: processed
+    payload_template: |
+      {
+        "file_path": "{{ trigger.event.path }}",
+        "processing_time": "{{ prev.result.duration_ms }}",
+        "saved_to_memory": true
+      }
+      
+retry:
+  attempts: 3
+  backoff_sec: 60
+  
+timeout_sec: 300
+enabled: true

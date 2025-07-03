@@ -8,7 +8,7 @@ docker compose down
 2. Пересобери Event Bus без пароля:
 docker compose build titan-eventbus
 3. Запусти заново:
-make up
+make all-up
 4. Проверь что Event Bus запустился без ошибок:
 docker logs titan-eventbus --tail 20
 Должно быть что-то вроде "Event Bus Server started" без ошибок AUTH.

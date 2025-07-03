@@ -1,0 +1,36 @@
+# Goal Scheduler service
+
+services:
+  goal-scheduler:
+    build:
+      context: .
+      dockerfile: goal-scheduler.Dockerfile
+    container_name: titan-goal-scheduler
+    environment:
+      - SCHEDULER_REDIS_URL=redis://redis-master:6379/2
+      - EVENT_BUS_URL=redis://redis-master:6379/0
+      - GOALS_DIR=/app/goals
+      - SCHEDULER_API_HOST=0.0.0.0
+      - SCHEDULER_API_PORT=8005
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8005:8005"  # API
+      - "8006:8006"  # Metrics
+    volumes:
+      - ./goals:/app/goals
+      - ./logs:/app/logs
+    depends_on:
+      - redis-master
+    networks:
+      - titan-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  titan-network:
+    external: true

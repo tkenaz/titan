@@ -3,11 +3,13 @@
 import asyncio
 import logging
 import json
+import time
 from typing import Dict, Any, Optional
 
 from goal_scheduler.config import SchedulerConfig
 from goal_scheduler.models import GoalStep, StepType
 from goal_scheduler.template_engine import TemplateEngine
+from goal_scheduler.metrics import goal_step_duration_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -85,20 +87,42 @@ class StepExecutor:
         context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute a single step based on its type."""
-        # Render step parameters with context
-        if step.params:
-            rendered_params = self.template_engine.render_dict(step.params, context)
-        else:
-            rendered_params = {}
+        start_time = time.time()
+        goal_id = context.get('goal_instance', {}).get('goal_id', 'unknown')
+        
+        try:
+            # Render step parameters with context
+            if step.params:
+                rendered_params = self.template_engine.render_dict(step.params, context)
+            else:
+                rendered_params = {}
+                
+            if step.type == StepType.PLUGIN:
+                result = await self._execute_plugin_step(step, rendered_params, context)
+            elif step.type == StepType.BUS_EVENT:
+                result = await self._execute_bus_event_step(step, rendered_params, context)
+            elif step.type == StepType.INTERNAL:
+                result = await self._execute_internal_step(step, rendered_params, context)
+            else:
+                raise ValueError(f"Unknown step type: {step.type}")
+                
+            # Record step duration
+            duration = time.time() - start_time
+            goal_step_duration_seconds.labels(
+                goal=goal_id,
+                step=step.id
+            ).observe(duration)
             
-        if step.type == StepType.PLUGIN:
-            return await self._execute_plugin_step(step, rendered_params, context)
-        elif step.type == StepType.BUS_EVENT:
-            return await self._execute_bus_event_step(step, rendered_params, context)
-        elif step.type == StepType.INTERNAL:
-            return await self._execute_internal_step(step, rendered_params, context)
-        else:
-            raise ValueError(f"Unknown step type: {step.type}")
+            return result
+            
+        except Exception as e:
+            # Record step duration even on failure
+            duration = time.time() - start_time
+            goal_step_duration_seconds.labels(
+                goal=goal_id,
+                step=step.id
+            ).observe(duration)
+            raise
             
     async def _execute_plugin_step(
         self, 

@@ -20,6 +20,14 @@ from goal_scheduler.loader import GoalLoader
 from goal_scheduler.template_engine import TemplateEngine
 from goal_scheduler.executor import StepExecutor
 
+# Try to import titan_bus
+try:
+    from titan_bus import publish
+    TITAN_BUS_AVAILABLE = True
+except ImportError:
+    TITAN_BUS_AVAILABLE = False
+    publish = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -234,6 +242,21 @@ class GoalScheduler:
                 else:
                     # Mark as failed
                     await self.storage.update_instance_state(instance_id, GoalState.FAILED)
+                    
+                    # Send failure details to system.v1 for Memory Service
+                    if TITAN_BUS_AVAILABLE:
+                        last_error = await self.storage.get_last_error(instance_id)
+                        await publish(
+                            topic="system.v1",
+                            event_type="goal_failed",
+                            payload={
+                                "goal_id": instance.goal_id,
+                                "instance_id": instance_id,
+                                "fail_count": instance.fail_count,
+                                "error": last_error or "Unknown error",
+                                "timestamp": datetime.utcnow().isoformat()
+                            }
+                        )
                     
                     # Schedule next run anyway if periodic
                     if goal_config.schedule:

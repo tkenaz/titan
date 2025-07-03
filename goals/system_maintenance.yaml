@@ -1,0 +1,35 @@
+id: system_maintenance
+name: System Maintenance Tasks
+schedule: '@daily'  # Run once a day
+enabled: true
+
+steps:
+  - id: check_memory_usage
+    type: plugin
+    plugin: shell_runner
+    params:
+      command: "df -h /var/lib/postgresql/data | tail -1 | awk '{print $5}' | sed 's/%//'"
+      
+  - id: check_redis_memory
+    type: plugin  
+    plugin: shell_runner
+    params:
+      command: "redis-cli INFO memory | grep used_memory_human | cut -d: -f2"
+      
+  - id: report_status
+    type: bus_event
+    topic: system.v1  # Using system.v1 for system events
+    event_type: maintenance_report
+    payload_template: |
+      {
+        "timestamp": "{{ now }}",
+        "disk_usage_percent": {{ steps.check_memory_usage.result.output | int }},
+        "redis_memory": "{{ steps.check_redis_memory.result.output }}",
+        "goal": "system_maintenance"
+      }
+      
+retry:
+  attempts: 2
+  backoff_sec: 60
+  
+timeout_sec: 180

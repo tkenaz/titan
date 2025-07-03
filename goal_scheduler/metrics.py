@@ -21,6 +21,14 @@ goal_duration_seconds = Histogram(
     ['goal']
 )
 
+# Step execution metrics
+goal_step_duration_seconds = Histogram(
+    'titan_goal_step_duration_seconds',
+    'Goal step execution duration in seconds',
+    ['goal', 'step'],
+    buckets=(0.1, 0.5, 1, 2, 5, 10, 30, 60)  # Custom buckets for steps
+)
+
 # Scheduler metrics
 scheduler_loop_latency_ms = Histogram(
     'titan_scheduler_loop_latency_ms',

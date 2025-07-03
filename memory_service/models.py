@@ -94,6 +94,7 @@ class EvaluationRequest(BaseModel):
     message: str
     context: Optional[Dict[str, Any]] = None
     source: Optional[str] = None
+    force_save: bool = False  # Force save regardless of importance
 
 
 class EvaluationResponse(BaseModel):
@@ -109,7 +110,7 @@ class SearchRequest(BaseModel):
     query: str
     k: int = Field(default=10, ge=1, le=100)
     tags: Optional[List[str]] = None
-    min_similarity: float = Field(default=0.5, ge=0.0, le=1.0)
+    min_similarity: float = Field(default=0.4, ge=0.0, le=1.0)  # Снизили с 0.5
 
 
 class RememberRequest(BaseModel):

@@ -2,3 +2,20 @@
 docker compose -f docker-compose.memory.yml build memory-service
 make memory-down
 make memory-up
+
+1. Останови все сервисы:
+docker compose down
+2. Пересобери Event Bus без пароля:
+docker compose build titan-eventbus
+3. Запусти заново:
+make up
+4. Проверь что Event Bus запустился без ошибок:
+docker logs titan-eventbus --tail 20
+Должно быть что-то вроде "Event Bus Server started" без ошибок AUTH.
+5. Если все ок, запусти прямой тест:
+python test_direct_redis.py
+6. И потом полное демо:
+python demo_full_system.py
+
+
+python -m uvicorn plugin_manager.api:app --host 0.0.0.0 --port 8003

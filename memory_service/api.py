@@ -1,5 +1,6 @@
 """FastAPI application for Memory Service."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import List
@@ -59,7 +60,7 @@ event_integration: MemoryEventBusIntegration = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    global memory_service
+    global memory_service, event_integration
     
     # Load config
     config = MemoryConfig()
@@ -79,10 +80,13 @@ async def lifespan(app: FastAPI):
     logger.info("Memory Service started")
     
     # Initialize Event Bus integration
+    global event_integration
     event_integration = MemoryEventBusIntegration(config, memory_service)
     try:
         await event_integration.start()
         logger.info("Event Bus integration started")
+        # Give processor time to start
+        await asyncio.sleep(0.5)
     except Exception as e:
         logger.warning(f"Event Bus integration failed to start: {e}")
         # Continue without event integration

@@ -5,7 +5,7 @@ plugins_dir: plugins
 logs_dir: logs/plugins
 
 # Event Bus
-event_bus_url: redis://:titan_secret_2025@redis-master:6379/0
+event_bus_url: redis://redis-master:6379/0
 consumer_group: plugins
 
 # Sandbox settings

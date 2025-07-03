@@ -13,7 +13,9 @@ redis[hiredis]>=5.0.0
 # ML/Embeddings
 numpy>=1.26.0
 openai>=1.0.0  # Optional, for OpenAI embeddings
-# sentence-transformers>=2.2.0  # Alternative for local embeddings
+sentence-transformers>=2.2.0  # For ML evaluator
+torch>=2.0.0  # For ML evaluator
+transformers>=4.35.0  # For ML evaluator
 
 # Utilities
 ulid-py>=1.1.0

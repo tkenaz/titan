@@ -34,10 +34,15 @@ class VectorStorage:
     
     async def connect(self):
         """Initialize connection pool."""
+        # Import pgvector asyncpg support
+        import pgvector.asyncpg
+        
         self._pool = await asyncpg.create_pool(
             self.config.vector_db.dsn,
             min_size=5,
-            max_size=self.config.vector_db.pool_size
+            max_size=self.config.vector_db.pool_size,
+            # Register vector type codec!
+            init=pgvector.asyncpg.register_vector
         )
         
         # Ensure pgvector extension and table exist
@@ -103,17 +108,16 @@ class VectorStorage:
                         WHERE id = $1
                     """, existing_id)
                     
-                    logger.info(f"Updated existing memory {existing_id} (similarity: {similar[0][1]:.3f})")
+                    logger.info(f"Updated existing memory {existing_id}")
                     return existing_id
             
-            # Convert embedding to PostgreSQL vector format
-            embedding_str = None
+            # pgvector codec handles conversion automatically
+            embedding_value = None
             if entry.embedding:
                 if hasattr(entry.embedding, 'tolist'):
-                    embedding_list = entry.embedding.tolist()
+                    embedding_value = entry.embedding.tolist()
                 else:
-                    embedding_list = entry.embedding
-                embedding_str = '[' + ','.join(map(str, embedding_list)) + ']'
+                    embedding_value = entry.embedding
             
             # Insert new entry
             await conn.execute("""
@@ -121,11 +125,11 @@ class VectorStorage:
                     id, summary, embedding, embedding_model, static_priority,
                     usage_count, last_accessed, created_at, tags, 
                     emotional_weight, source, metadata
-                ) VALUES ($1, $2, $3::vector, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             """,
                 entry.id,
                 entry.summary,
-                embedding_str,
+                embedding_value,  # pgvector codec handles conversion
                 entry.embedding_model,
                 entry.static_priority.value,
                 entry.usage_count,
@@ -146,19 +150,45 @@ class VectorStorage:
         k: int = 10,
         threshold: float = 0.5
     ) -> List[MemorySearchResult]:
-        """Search for similar memories."""
+        """Search for similar memories using vector similarity."""
+        logger.info(f"VectorStorage.search called with k={k}, threshold={threshold}")
+        
         async with self._pool.acquire() as conn:
-            results = await self._find_similar(conn, query_embedding, threshold, k)
+            # With pgvector codec registered, pass list directly
+            if hasattr(query_embedding, 'tolist'):
+                embedding_list = query_embedding.tolist()
+            else:
+                embedding_list = query_embedding
+            
+            # Vector similarity search - pass list directly, not string!
+            rows = await conn.fetch("""
+                SELECT 
+                    *,
+                    1 - (embedding <=> $1) AS similarity
+                FROM memory_entries
+                WHERE embedding IS NOT NULL
+                    AND 1 - (embedding <=> $1) > $2
+                ORDER BY similarity DESC
+                LIMIT $3
+            """, embedding_list, threshold, k)  # Pass list, not string
+            
+            logger.info(f"Found {len(rows)} similar memories")
             
             search_results = []
-            for row in results:
-                memory = await self._row_to_memory(row)
-                search_results.append(
-                    MemorySearchResult(
-                        memory=memory,
-                        similarity=row['similarity']
+            for row in rows:
+                try:
+                    memory = await self._row_to_memory(row)
+                    similarity = float(row['similarity'])
+                    logger.debug(f"Memory: {memory.id} (similarity: {similarity:.3f})")
+                    search_results.append(
+                        MemorySearchResult(
+                            memory=memory,
+                            similarity=similarity
+                        )
                     )
-                )
+                except Exception as e:
+                    logger.error(f"Failed to parse memory row: {e}")
+                    continue
             
             return search_results
     
@@ -225,26 +255,27 @@ class VectorStorage:
             embedding_list = embedding.tolist()
         else:
             embedding_list = embedding
-            
-        # Convert to PostgreSQL vector format
-        vector_str = '[' + ','.join(map(str, embedding_list)) + ']'
         
+        # With pgvector codec, pass list directly
         return await conn.fetch("""
             SELECT 
                 *,
-                1 - (embedding <=> $1::vector) AS similarity
+                1 - (embedding <=> $1) AS similarity
             FROM memory_entries
-            WHERE 1 - (embedding <=> $1::vector) > $2
-            ORDER BY embedding <=> $1::vector
+            WHERE 1 - (embedding <=> $1) > $2
+            ORDER BY embedding <=> $1
             LIMIT $3
-        """, vector_str, threshold, limit)
+        """, embedding_list, threshold, limit)
     
     async def _row_to_memory(self, row: asyncpg.Record) -> MemoryEntry:
         """Convert database row to MemoryEntry."""
+        # Parse embedding - now properly handled by pgvector codec
+        embedding = row['embedding']  # Will be a list thanks to register_vector
+        
         return MemoryEntry(
             id=row['id'],
             summary=row['summary'],
-            embedding=row['embedding'].tolist() if row['embedding'] else None,
+            embedding=embedding,
             embedding_model=row['embedding_model'],
             static_priority=StaticPriority(row['static_priority']),
             usage_count=row['usage_count'],
@@ -334,14 +365,14 @@ class GraphStorage:
     ) -> List[Dict]:
         """Find memories related to given memory."""
         async with self._driver.session() as session:
-            result = await session.run("""
-                MATCH (m:Memory {id: $id})-[*1..$depth]-(related:Memory)
+            # Build query with literal depth value
+            query = f"""
+                MATCH (m:Memory {{id: $id}})-[*1..{max_depth}]-(related:Memory)
                 RETURN DISTINCT related.id AS id, related.summary AS summary
                 LIMIT 20
-            """,
-                id=memory_id,
-                depth=max_depth
-            )
+            """
+            
+            result = await session.run(query, id=memory_id)
             
             return [dict(record) async for record in result]
     

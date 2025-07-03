@@ -105,25 +105,35 @@ All systems operational. Ready for production use.
         topic="system.v1",
         event_type="memory_save_requested",
         payload={
-            "text": "ВАЖНО: Система Titan полностью функциональна. Event Bus, Memory Service и Plugin Manager работают в связке. Дата запуска: " + datetime.now().isoformat(),
+            "text": "ВАЖНО: Система Titan полностью функциональна. Event Bus, Memory Service и Plugin Manager работают в связке. Дата запуска: " + datetime.now().isoformat() + ". Личный проект Марины. Планы: запустить Goal Scheduler.",
             "context": {"importance": "high", "project": "titan"}
         }
     )
     print(f"📤 Событие памяти отправлено: {memory_event_id}")
     
+    # Ждем обработки события
+    await asyncio.sleep(2)
+    
     # 9. Проверяем Memory Service
     print("\n7️⃣ Проверяем Memory Service...")
     async with httpx.AsyncClient() as client:
         # Ищем в памяти
-        search_response = await client.post(
+        search_response = await client.get(
             "http://localhost:8001/memory/search",
-            json={"query": "Titan функциональна", "limit": 5}
+            params={"q": "Titan", "k": 5}
         )
         if search_response.status_code == 200:
             results = search_response.json()
             print(f"   Найдено воспоминаний: {len(results)}")
             if results:
-                print(f"   Последнее: {results[0]['summary'][:100]}...")
+                # Check the structure of results
+                first_result = results[0]
+                if isinstance(first_result, dict) and 'memory' in first_result:
+                    print(f"   Последнее: {first_result['memory']['summary'][:100]}...")
+                elif isinstance(first_result, dict) and 'summary' in first_result:
+                    print(f"   Последнее: {first_result['summary'][:100]}...")
+                else:
+                    print(f"   Структура результата: {list(first_result.keys()) if isinstance(first_result, dict) else type(first_result)}")
     
     # 10. Финальная команда
     print("\n8️⃣ Финальный тест - цепочка событий...")

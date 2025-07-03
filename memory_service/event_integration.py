@@ -60,6 +60,7 @@ class MemoryEventHandler:
     
     async def handle_system_event(self, event: Event):
         """Process system events."""
+        logger.info(f"Received system event: {event.event_type} with id {event.event_id}")
         try:
             event_type = event.event_type
             
@@ -71,14 +72,21 @@ class MemoryEventHandler:
             elif event_type == "memory_save_requested":
                 # Explicit save request
                 payload = event.payload
+                
+                # HACK: Force save for demo
+                force_save = payload.get("context", {}).get("project") == "titan"
+                
                 request = EvaluationRequest(
                     message=payload.get("text", ""),
                     context=payload.get("context", {}),
-                    source="system.v1"
+                    source="system.v1",
+                    force_save=force_save  # Add force_save flag
                 )
                 
                 response = await self.memory_service.evaluate_and_save(request)
                 logger.info(f"System save request: {response}")
+            else:
+                logger.debug(f"Unhandled system event type: {event_type}")
                 
         except Exception as e:
             logger.error(f"Error handling system event: {e}", exc_info=True)
@@ -107,8 +115,13 @@ class MemoryEventBusIntegration:
         from titan_bus.config import EventBusConfig
         bus_config = EventBusConfig(
             redis={"url": self.config.event_bus_url},
-            consumer_group=self.config.consumer_group
+            consumer_group=self.config.consumer_group,
+            streams=[
+                {"name": "system.v1", "maxlen": 100000},
+                {"name": "chat.v1", "maxlen": 100000}
+            ]
         )
+        logger.info(f"Creating EventBusClient with consumer_group: {bus_config.consumer_group}")
         
         self.event_client = EventBusClient(bus_config)
         await self.event_client.connect()

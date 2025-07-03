@@ -1,5 +1,5 @@
 redis:
-  url: "redis://:titan_secret_2025@redis-master:6379/0"
+  url: "redis://host.docker.internal:6379/0"
   pool_size: 20
 
 streams:

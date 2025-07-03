@@ -130,6 +130,8 @@ class EventProcessor:
         if stream in self._initialized_groups:
             return
         
+        logger.info(f"Attempting to create consumer group '{self.config.consumer_group}' for stream '{stream}'")
+        
         try:
             await self.redis.xgroup_create(
                 stream, 
@@ -141,7 +143,9 @@ class EventProcessor:
             logger.info(f"Created consumer group {self.config.consumer_group} for {stream}")
         except redis.ResponseError as e:
             if "BUSYGROUP" not in str(e):
+                logger.error(f"Failed to create consumer group: {e}")
                 raise
+            logger.info(f"Consumer group {self.config.consumer_group} already exists for {stream}")
             self._initialized_groups.add(stream)
     
     async def _consume_stream(self, stream_config: StreamConfig) -> None:

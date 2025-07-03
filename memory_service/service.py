@@ -16,12 +16,24 @@ from memory_service.models import (
     ForgetRequest,
 )
 from memory_service.config import MemoryConfig
-from memory_service.evaluator import MemoryEvaluator
 from memory_service.embeddings import EmbeddingService
 from memory_service.storage import VectorStorage, GraphStorage, RecentCache
+from memory_service.embedding_config import get_optimal_thresholds
 
 
 logger = logging.getLogger(__name__)
+
+# Try ML evaluator, fallback to lightweight, then regex
+try:
+    from memory_service.evaluator_ml import MLMemoryEvaluator as MemoryEvaluator
+    logger.info("Using ML-based evaluator with e5-large")
+except ImportError:
+    try:
+        from memory_service.evaluator_lightweight import MLMemoryEvaluator as MemoryEvaluator
+        logger.warning("ML dependencies not available, using lightweight evaluator")
+    except ImportError:
+        from memory_service.evaluator import MemoryEvaluator
+        logger.warning("Using basic regex-based evaluator")
 
 
 class MemoryService:
@@ -86,11 +98,21 @@ class MemoryService:
         )
         await self.recent_cache.add(recent_msg)
         
-        # Evaluate importance
-        should_save, importance, features = self.evaluator.evaluate(
-            request.message,
-            request.context
-        )
+        # Check force_save flag
+        if request.force_save:
+            should_save = True
+            importance = 1.0  # Max importance for forced saves
+            # Extract features anyway for metadata
+            _, _, features = self.evaluator.evaluate(
+                request.message,
+                request.context
+            )
+        else:
+            # Evaluate importance
+            should_save, importance, features = self.evaluator.evaluate(
+                request.message,
+                request.context
+            )
         
         if not should_save:
             return EvaluationResponse(
@@ -103,14 +125,18 @@ class MemoryService:
         embedding = await self.embedding_service.create_embedding(request.message)
         
         # Check for novelty
+        similar = []
         if embedding:
+            # Get optimal threshold for duplicate detection
+            _, duplicate_threshold = get_optimal_thresholds(self.config.embedding_model)
+            
             similar = await self.vector_storage.search(
                 embedding,
                 k=5,
-                threshold=0.7
+                threshold=0.7  # Use slightly lower for initial check
             )
             
-            if similar and similar[0].similarity > 0.9:
+            if similar and similar[0].similarity > duplicate_threshold:
                 # Too similar to existing memory
                 await self._update_existing(similar[0].memory.id)
                 return EvaluationResponse(

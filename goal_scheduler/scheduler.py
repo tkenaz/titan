@@ -18,7 +18,7 @@ from goal_scheduler.models import (
 from goal_scheduler.storage import GoalStorage
 from goal_scheduler.loader import GoalLoader
 from goal_scheduler.template_engine import TemplateEngine
-from goal_scheduler.executor_simple import StepExecutor
+from goal_scheduler.executor import StepExecutor
 
 logger = logging.getLogger(__name__)
 

@@ -36,25 +36,37 @@ class StepExecutor:
     async def connect(self):
         """Connect to Event Bus."""
         if TITAN_BUS_AVAILABLE:
-            # Create EventBusConfig with proper Redis config
-            from titan_bus.config import RedisConfig
+            # IMPORTANT: Create config without allowing env override
+            import os
             
-            # Debug logging
-            logger.info(f"Creating RedisConfig with URL: {self.config.event_bus_url}")
+            # Temporarily clear TITAN env vars to prevent override
+            titan_env_backup = {}
+            for key in list(os.environ.keys()):
+                if key.startswith('TITAN_'):
+                    titan_env_backup[key] = os.environ.pop(key)
             
-            redis_config = RedisConfig(url=self.config.event_bus_url)
-            logger.info(f"RedisConfig created with URL: {redis_config.url}")
-            
-            bus_config = EventBusConfig(redis=redis_config)
-            logger.info(f"EventBusConfig redis.url: {bus_config.redis.url}")
-            
-            self.event_bus = EventBusClient(bus_config)
-            await self.event_bus.connect()
+            try:
+                # Create EventBusConfig with proper Redis config
+                from titan_bus.config import RedisConfig
+                
+                logger.info(f"Creating RedisConfig with URL: {self.config.event_bus_url}")
+                
+                redis_config = RedisConfig(url=self.config.event_bus_url)
+                logger.info(f"RedisConfig created with URL: {redis_config.url}")
+                
+                # Create EventBusConfig with our Redis config
+                bus_config = EventBusConfig(redis=redis_config)
+                logger.info(f"EventBusConfig redis.url: {bus_config.redis.url}")
+                
+                self.event_bus = EventBusClient(bus_config)
+                await self.event_bus.connect()
+            finally:
+                # Restore env vars
+                os.environ.update(titan_env_backup)
             
             # Subscribe to plugin results
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "plugin.result",
-                self.config.consumer_group,
                 self._handle_plugin_result
             )
             

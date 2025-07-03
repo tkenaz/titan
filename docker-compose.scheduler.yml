@@ -7,8 +7,8 @@ services:
       dockerfile: goal-scheduler.Dockerfile
     container_name: titan-goal-scheduler
     environment:
-      - SCHEDULER_REDIS_URL=redis://redis-master:6379/2
-      - EVENT_BUS_URL=redis://redis-master:6379/0
+      - SCHEDULER_REDIS_URL=redis://titan-redis-master:6379/2
+      - EVENT_BUS_URL=redis://titan-redis-master:6379/0
       - GOALS_DIR=/app/goals
       - SCHEDULER_API_HOST=0.0.0.0
       - SCHEDULER_API_PORT=8005

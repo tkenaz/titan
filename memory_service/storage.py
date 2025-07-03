@@ -69,6 +69,7 @@ class VectorStorage:
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_memory_embedding 
                 ON memory_entries USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 100)
             """)
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_memory_last_accessed 
@@ -77,6 +78,10 @@ class VectorStorage:
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_memory_tags 
                 ON memory_entries USING gin (tags)
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_memory_created 
+                ON memory_entries (created_at DESC)
             """)
         
         logger.info("VectorStorage connected and initialized")

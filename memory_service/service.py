@@ -19,6 +19,7 @@ from memory_service.config import MemoryConfig
 from memory_service.embeddings import EmbeddingService
 from memory_service.storage import VectorStorage, GraphStorage, RecentCache
 from memory_service.embedding_config import get_optimal_thresholds
+from memory_service import metrics
 
 
 logger = logging.getLogger(__name__)
@@ -109,10 +110,17 @@ class MemoryService:
             )
         else:
             # Evaluate importance
-            should_save, importance, features = self.evaluator.evaluate(
-                request.message,
-                request.context
-            )
+            with metrics.evaluation_duration.time():
+                should_save, importance, features = self.evaluator.evaluate(
+                    request.message,
+                    request.context
+                )
+        
+        # Track evaluation
+        metrics.memories_evaluated_total.labels(
+            saved=str(should_save),
+            source=request.source or "unknown"
+        ).inc()
         
         if not should_save:
             return EvaluationResponse(
@@ -139,6 +147,12 @@ class MemoryService:
             if similar and similar[0].similarity > duplicate_threshold:
                 # Too similar to existing memory
                 await self._update_existing(similar[0].memory.id)
+                
+                # Track duplicate
+                metrics.memories_duplicates_total.labels(
+                    source=request.source or "unknown"
+                ).inc()
+                
                 return EvaluationResponse(
                     saved=False,
                     id=similar[0].memory.id,

@@ -1,175 +1,224 @@
-"""FastAPI application for Plugin Manager."""
+"""Plugin Manager API with authentication."""
 
-import logging
-from typing import Dict, List, Optional
-from pathlib import Path
-
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import PlainTextResponse
+import os
+from contextlib import asynccontextmanager
+from typing import Optional
+from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from plugin_manager.manager import PluginManager
-from plugin_manager.config import PluginManagerConfig
-from plugin_manager.event_bus import PluginEventBusIntegration
+from plugin_manager.enhanced_manager import EnhancedPluginManager
+
+# Global manager instance
+manager: Optional[EnhancedPluginManager] = None
 
 
-logger = logging.getLogger(__name__)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan."""
+    global manager
+    
+    # Startup
+    manager = EnhancedPluginManager(
+        plugin_dir=os.getenv("PLUGIN_DIR", "./plugins"),
+        redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    )
+    
+    await manager.initialize()
+    
+    yield
+    
+    # Shutdown
+    if manager:
+        await manager.shutdown()
 
-# API models
-class PluginListResponse(BaseModel):
-    plugins: Dict[str, Dict]
 
-
-class TriggerRequest(BaseModel):
-    plugin_name: str
-    event_data: Dict
-
-
-class TriggerResponse(BaseModel):
-    success: bool
-    stdout: Optional[str] = None
-    stderr: Optional[str] = None
-    error: Optional[str] = None
-    duration_ms: float
-
-
-# Create FastAPI app
+# Initialize FastAPI app
 app = FastAPI(
-    title="Titan Plugin Manager",
-    description="Dynamic plugin management for Titan",
-    version="0.1.0"
+    title="Titan Plugin Manager API",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# Global instances (initialized in lifespan)
-plugin_manager: Optional[PluginManager] = None
-event_bus: Optional[PluginEventBusIntegration] = None
+# Security
+security = HTTPBearer()
 
 
-@app.on_event("startup")
-async def startup():
-    """Initialize plugin manager on startup."""
-    global plugin_manager, event_bus
-    
-    # Load config
-    config_path = Path("config/plugins-local.yaml")
-    if not config_path.exists():
-        config_path = Path("config/plugins.yaml")
-    
-    if config_path.exists():
-        config = PluginManagerConfig.from_yaml(str(config_path))
-    else:
-        config = PluginManagerConfig()
-    
-    # Create plugin manager
-    plugin_manager = PluginManager(config)
-    await plugin_manager.start()
-    
-    # Create event bus integration (optional for local testing)
-    try:
-        event_bus = PluginEventBusIntegration(config, plugin_manager)
-        await event_bus.start()
-    except Exception as e:
-        logger.warning(f"Event Bus integration failed: {e}")
-        logger.warning("Running without Event Bus integration")
-    
-    logger.info("Plugin Manager API started")
+class PluginExecuteRequest(BaseModel):
+    """Request to execute a plugin."""
+    plugin: str
+    event_data: dict
 
 
-@app.on_event("shutdown")
-async def shutdown():
-    """Clean up on shutdown."""
-    if event_bus:
-        await event_bus.stop()
+class PluginPauseRequest(BaseModel):
+    """Request to pause a plugin."""
+    minutes: int = 60
+
+
+class CleanupRequest(BaseModel):
+    """Request to cleanup containers."""
+    force: bool = False
+
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    """Verify Bearer token."""
+    token = credentials.credentials
+    expected_token = os.getenv("ADMIN_TOKEN", "")
     
-    if plugin_manager:
-        await plugin_manager.stop()
+    if not expected_token:
+        raise HTTPException(
+            status_code=500,
+            detail="ADMIN_TOKEN not configured"
+        )
     
-    logger.info("Plugin Manager API stopped")
+    if token != expected_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token"
+        )
+    
+    return token
+
 
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+    """Health check endpoint (no auth required)."""
+    return {"status": "healthy", "service": "plugin-manager"}
 
 
-@app.get("/plugins", response_model=PluginListResponse)
+@app.get("/plugins", dependencies=[Depends(verify_token)])
 async def list_plugins():
-    """List all loaded plugins."""
-    if not plugin_manager:
-        raise HTTPException(status_code=503, detail="Plugin manager not initialized")
+    """List all plugins and their status."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
     
-    return PluginListResponse(plugins=plugin_manager.get_plugin_status())
+    return await manager.get_plugin_status()
 
 
-@app.post("/plugins/reload")
-async def reload_plugins():
-    """Hot reload all plugins."""
-    if not plugin_manager:
-        raise HTTPException(status_code=503, detail="Plugin manager not initialized")
+@app.get("/plugins/{plugin_name}", dependencies=[Depends(verify_token)])
+async def get_plugin_status(plugin_name: str):
+    """Get detailed status of a specific plugin."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
     
-    await plugin_manager.reload_plugins()
+    status = await manager.get_plugin_status()
+    plugin_status = status['plugins'].get(plugin_name)
+    
+    if not plugin_status:
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_name} not found")
+    
+    # Get health details
+    health = await manager.circuit_breaker.get_plugin_health(plugin_name)
     
     return {
-        "status": "reloaded",
-        "plugins": list(plugin_manager.plugins.keys())
+        "plugin": plugin_name,
+        "status": plugin_status,
+        "health": {
+            "state": health.state.value if health else "unknown",
+            "consecutive_failures": health.consecutive_failures if health else 0,
+            "failure_reasons": health.failure_reasons[-5:] if health else []  # Last 5 failures
+        }
     }
 
 
-@app.get("/plugins/{name}/logs", response_class=PlainTextResponse)
-async def get_plugin_logs(name: str, lines: int = 100):
-    """Get recent logs for a plugin."""
-    if not plugin_manager:
-        raise HTTPException(status_code=503, detail="Plugin manager not initialized")
+@app.post("/plugins/{plugin_name}/execute", dependencies=[Depends(verify_token)])
+async def execute_plugin(plugin_name: str, request: PluginExecuteRequest):
+    """Execute a plugin manually."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
     
-    if name not in plugin_manager.plugins:
-        raise HTTPException(status_code=404, detail=f"Plugin {name} not found")
-    
-    # Read log file
-    log_file = plugin_manager.config.logs_dir / f"{name}.log"
-    
-    if not log_file.exists():
-        return "No logs available"
-    
-    # Read last N lines
-    with open(log_file, "r") as f:
-        all_lines = f.readlines()
-        last_lines = all_lines[-lines:]
-        return "".join(last_lines)
-
-
-@app.post("/plugins/trigger", response_model=TriggerResponse)
-async def trigger_plugin(request: TriggerRequest):
-    """Manually trigger a plugin for testing."""
-    if not plugin_manager:
-        raise HTTPException(status_code=503, detail="Plugin manager not initialized")
-    
-    try:
-        result = await plugin_manager.trigger_plugin_manually(
-            request.plugin_name,
-            request.event_data
+    if request.plugin != plugin_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Plugin name in URL and body must match"
         )
-        
-        return TriggerResponse(
-            success=result.success,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            error=result.error,
-            duration_ms=result.duration_ms
+    
+    result = await manager.execute_plugin(plugin_name, request.event_data)
+    
+    if not result['success']:
+        raise HTTPException(
+            status_code=500,
+            detail=result.get('error', 'Plugin execution failed')
         )
-        
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to trigger plugin: {e}")
-        raise HTTPException(status_code=500, detail="Internal error")
+    
+    return result
 
 
+@app.post("/plugins/{plugin_name}/reset", dependencies=[Depends(verify_token)])
+async def reset_plugin(plugin_name: str):
+    """Reset a plugin to healthy state."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
+    
+    success = await manager.reset_plugin(plugin_name)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_name} not found")
+    
+    return {"message": f"Plugin {plugin_name} reset to healthy state"}
+
+
+@app.post("/plugins/{plugin_name}/pause", dependencies=[Depends(verify_token)])
+async def pause_plugin(plugin_name: str, request: PluginPauseRequest):
+    """Pause a plugin for specified minutes."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
+    
+    success = await manager.pause_plugin(plugin_name, request.minutes)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_name} not found")
+    
+    return {
+        "message": f"Plugin {plugin_name} paused for {request.minutes} minutes"
+    }
+
+
+@app.post("/containers/cleanup", dependencies=[Depends(verify_token)])
+async def cleanup_containers(request: CleanupRequest):
+    """Cleanup Docker containers."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
+    
+    cleaned = await manager.cleanup_containers(force=request.force)
+    
+    return {
+        "cleaned": cleaned,
+        "force": request.force
+    }
+
+
+@app.get("/containers/stats", dependencies=[Depends(verify_token)])
+async def container_stats():
+    """Get container statistics."""
+    if not manager:
+        raise HTTPException(status_code=503, detail="Manager not initialized")
+    
+    if not manager.watchdog:
+        raise HTTPException(status_code=503, detail="Watchdog not initialized")
+    
+    return await manager.watchdog.get_container_stats()
+
+
+# Metrics endpoint (Prometheus format)
 @app.get("/metrics")
 async def metrics():
-    """Prometheus metrics endpoint."""
-    # TODO: Implement Prometheus metrics
-    return PlainTextResponse(
-        "# HELP titan_plugin_invocations_total Total plugin invocations\n"
-        "# TYPE titan_plugin_invocations_total counter\n"
+    """Prometheus metrics endpoint (no auth for scraping)."""
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from fastapi.responses import Response
+    
+    return Response(
+        generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Load from environment
+    host = os.getenv("PLUGIN_API_HOST", "0.0.0.0")
+    port = int(os.getenv("PLUGIN_API_PORT", "8003"))
+    
+    uvicorn.run(app, host=host, port=port)

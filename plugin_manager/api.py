@@ -3,7 +3,7 @@
 import os
 from contextlib import asynccontextmanager
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -51,7 +51,7 @@ app.add_middleware(
 )
 
 # Security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 class PluginExecuteRequest(BaseModel):
@@ -70,8 +70,18 @@ class CleanupRequest(BaseModel):
     force: bool = False
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+async def verify_token(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[str]:
     """Verify Bearer token."""
+    # Skip auth for OPTIONS requests (CORS preflight)
+    if request.method == "OPTIONS":
+        return None
+    
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing authorization header"
+        )
+    
     token = credentials.credentials
     expected_token = os.getenv("ADMIN_TOKEN", "")
     

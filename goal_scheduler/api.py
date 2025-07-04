@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -54,11 +54,21 @@ app.add_middleware(
 )
 
 # Security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+async def verify_token(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[str]:
     """Verify Bearer token."""
+    # Skip auth for OPTIONS requests (CORS preflight)
+    if request.method == "OPTIONS":
+        return None
+    
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing authorization header"
+        )
+    
     token = credentials.credentials
     expected_token = os.getenv("ADMIN_TOKEN", "titan-secret-token-change-me-in-production")
     

@@ -149,9 +149,35 @@ scheduler-logs:
 scheduler-reload:
 	curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}" http://localhost:8005/goals/reload
 
+# Model Gateway commands
+gateway-up:
+	docker compose -f docker-compose.yml -f docker-compose.model.yml up -d
+	@echo "Model Gateway starting..."
+	@echo "  - API: http://localhost:8081"
+	@echo "  - Metrics: http://localhost:8081/metrics"
+	@echo "  - Health: http://localhost:8081/health"
+
+gateway-down:
+	docker compose -f docker-compose.yml -f docker-compose.model.yml down model-gateway
+
+gateway-test:
+	@echo "Testing Model Gateway..."
+	@bash scripts/test_model_gateway.sh
+
+gateway-logs:
+	docker compose -f docker-compose.yml -f docker-compose.model.yml logs -f model-gateway
+
+gateway-budget:
+	@echo "Current budget status:"
+	@curl -s -H "Authorization: Bearer ${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}" http://localhost:8081/budget/stats | jq .
+
+gateway-reset-budget:
+	@echo "Resetting daily budget..."
+	@curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}" http://localhost:8081/budget/reset
+
 # All services
-all-up: up memory-up plugins-up scheduler-up
+all-up: up memory-up plugins-up scheduler-up gateway-up
 	@echo "All Titan services started!"
 
-all-down: scheduler-down plugins-down memory-down down
+all-down: gateway-down scheduler-down plugins-down memory-down down
 	@echo "All Titan services stopped."

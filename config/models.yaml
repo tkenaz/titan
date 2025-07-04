@@ -1,0 +1,38 @@
+models:
+  o3-pro:
+    provider: openai
+    engine: o3-pro
+    input_cost: 0.00002   # USD per token
+    output_cost: 0.00008
+    max_tokens: 4096
+    timeout: 300
+    supports_streaming: true
+    
+  gpt-4o:
+    provider: openai
+    engine: gpt-4o
+    input_cost: 0.0000025
+    output_cost: 0.00001
+    max_tokens: 8192
+    timeout: 120
+    supports_streaming: true
+    
+  gpt-4.5-preview:
+    provider: openai
+    engine: gpt-4.5-preview
+    input_cost: 0.000075
+    output_cost: 0.00015
+    max_tokens: 32768
+    timeout: 180
+    supports_streaming: true
+
+defaults:
+  self_reflection: o3-pro
+  self_reflection_frequent: gpt-4o
+  vitals: gpt-4o
+  experiment: o3-pro
+
+budget:
+  daily_limit_usd: 20
+  hard_stop: true
+  warning_threshold: 0.8

@@ -1,0 +1,35 @@
+# Model Gateway Service
+services:
+  model-gateway:
+    build:
+      context: .
+      dockerfile: model-gateway.Dockerfile
+    container_name: titan-model-gateway
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_URL=redis://redis-master:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-development-token}
+      - HMAC_SECRET=${HMAC_SECRET:-change-me-in-production}
+      - DB_URL=postgresql://postgres:Frfgekmrj391@host.docker.internal:5432/chatGPT
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    networks:
+      - titan-network
+    depends_on:
+      redis-master:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  titan-network:
+    external: true

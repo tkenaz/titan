@@ -5,6 +5,7 @@ from typing import List, Optional
 import numpy as np
 
 from memory_service.config import MemoryConfig
+from memory_service.cost import get_cost_tracker
 import asyncio
 import os
 
@@ -38,6 +39,15 @@ class EmbeddingService:
                     model=self.model_name,
                     input=text
                 )
+                
+                # Track cost
+                if hasattr(response, 'usage') and response.usage:
+                    cost_tracker = await get_cost_tracker()
+                    await cost_tracker.add_cost(
+                        kind="embed",
+                        tokens=response.usage.total_tokens
+                    )
+                
                 return response.data[0].embedding
             except Exception as e:
                 logger.error(f"OpenAI embedding failed: {e}")
@@ -53,6 +63,15 @@ class EmbeddingService:
                     model=self.model_name,
                     input=texts
                 )
+                
+                # Track cost
+                if hasattr(response, 'usage') and response.usage:
+                    cost_tracker = await get_cost_tracker()
+                    await cost_tracker.add_cost(
+                        kind="embed",
+                        tokens=response.usage.total_tokens
+                    )
+                
                 return [item.embedding for item in response.data]
             except Exception as e:
                 logger.error(f"Batch embedding failed: {e}")

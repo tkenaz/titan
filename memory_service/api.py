@@ -206,6 +206,39 @@ async def memory_stats():
     }
 
 
+@app.get("/memory/cost", dependencies=[Depends(verify_token)])
+async def get_cost_stats(days: int = Query(7, ge=1, le=90)):
+    """Get cost statistics for the last N days."""
+    from memory_service.cost import get_cost_tracker
+    from datetime import datetime, timedelta
+    
+    cost_tracker = await get_cost_tracker()
+    
+    total_usd = 0.0
+    total_embed = 0
+    total_llm = 0
+    daily_costs = []
+    
+    # Get costs for last N days
+    for i in range(days):
+        date = datetime.utcnow() - timedelta(days=i)
+        daily = await cost_tracker.get_daily_cost(date)
+        
+        if daily["usd_total"] > 0 or i == 0:  # Include today even if zero
+            daily_costs.append(daily)
+            total_usd += daily["usd_total"]
+            total_embed += daily["embed_tokens"]
+            total_llm += daily["llm_tokens"]
+    
+    return {
+        "period_days": days,
+        "total_usd": round(total_usd, 6),
+        "total_embed_tokens": total_embed,
+        "total_llm_tokens": total_llm,
+        "daily_breakdown": daily_costs
+    }
+
+
 # Special endpoint for testing without auth (development only)
 if os.getenv("ENVIRONMENT") == "development":
     @app.get("/memory/search")

@@ -7,6 +7,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 
 from goal_scheduler.config import SchedulerConfig
 from goal_scheduler.models import (
@@ -41,6 +42,15 @@ app = FastAPI(
     title="Titan Goal Scheduler API",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Security

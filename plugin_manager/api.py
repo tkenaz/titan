@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from plugin_manager.enhanced_manager import EnhancedPluginManager
@@ -38,6 +39,15 @@ app = FastAPI(
     title="Titan Plugin Manager API",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Security

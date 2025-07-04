@@ -1,0 +1,104 @@
+{
+  "name": "titan-desktop",
+  "version": "0.1.0",
+  "description": "Titan Desktop UI - Control center for autonomous AI systems",
+  "main": "dist/main/index.js",
+  "author": "Titan Team",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:vite && npm run dev:electron",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on tcp:5173 && electron .",
+    "build": "npm run build:vite && npm run build:electron",
+    "build:vite": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "preview": "vite preview",
+    "make": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish=never",
+    "dist:all": "npm run build && electron-builder -mwl",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "lint": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write .",
+    "generate-api": "npm run generate-api:memory && npm run generate-api:plugins && npm run generate-api:goals && npm run generate-api:gateway",
+    "generate-api:memory": "openapi-typescript http://localhost:8001/openapi.json -o src/api/generated/memory.ts",
+    "generate-api:plugins": "openapi-typescript http://localhost:8003/openapi.json -o src/api/generated/plugins.ts", 
+    "generate-api:goals": "openapi-typescript http://localhost:8005/openapi.json -o src/api/generated/goals.ts",
+    "generate-api:gateway": "openapi-typescript http://localhost:8081/openapi.json -o src/api/generated/gateway.ts"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.0.1",
+    "axios": "^1.6.5",
+    "clsx": "^2.1.0",
+    "cronstrue": "^2.47.0",
+    "date-fns": "^3.3.1",
+    "electron-store": "^8.1.0",
+    "keytar": "^7.9.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-redux": "^9.0.4",
+    "react-router-dom": "^6.21.1",
+    "recharts": "^2.10.4",
+    "lucide-react": "^0.303.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.2.0",
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.46",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "openapi-typescript": "^6.7.3",
+    "postcss": "^8.4.33",
+    "prettier": "^3.1.1",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vite-plugin-electron": "^0.15.5",
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "vitest": "^1.1.3",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "productName": "Titan Desktop",
+    "appId": "com.titan.desktop",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icons/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development",
+      "icon": "assets/icons"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true
+    }
+  }
+}

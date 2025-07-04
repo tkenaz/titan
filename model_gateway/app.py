@@ -9,6 +9,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.responses import StreamingResponse, PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import redis.asyncio as redis
 import json
@@ -166,6 +167,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # В продакшене укажите конкретные домены
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 async def verify_token(authorization: Optional[str] = Header(None)) -> str:
     """Verify Bearer token"""
@@ -285,6 +295,9 @@ async def proxy_request(
                         data = json.dumps(openai_chunk)
                         yield f"data: {data}\n\n"
             except Exception as e:
+                import traceback
+                logger.error(f"Streaming error in generate: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 error_data = json.dumps({"error": str(e)})
                 yield f"data: {error_data}\n\n"
         

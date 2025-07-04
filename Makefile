@@ -175,9 +175,19 @@ gateway-reset-budget:
 	@echo "Resetting daily budget..."
 	@curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-titan-secret-token-change-me-in-production}" http://localhost:8081/budget/reset
 
+# WebSocket Bridge commands
+ws-bridge-up:
+	@echo "Starting WebSocket Bridge..."
+	python event_ws_bridge.py &
+	@echo "WebSocket Bridge started on ws://localhost:8088/events"
+
+ws-bridge-down:
+	@echo "Stopping WebSocket Bridge..."
+	@pkill -f event_ws_bridge.py || true
+
 # All services
-all-up: up memory-up plugins-up scheduler-up gateway-up
+all-up: up memory-up plugins-up scheduler-up gateway-up ws-bridge-up
 	@echo "All Titan services started!"
 
-all-down: gateway-down scheduler-down plugins-down memory-down down
+all-down: ws-bridge-down gateway-down scheduler-down plugins-down memory-down down
 	@echo "All Titan services stopped."

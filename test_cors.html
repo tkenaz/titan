@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Titan API CORS Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+        }
+        .test {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        .success { border-color: #0f0; }
+        .error { border-color: #f00; }
+        .pending { border-color: #ff0; }
+        pre {
+            background: #000;
+            padding: 10px;
+            overflow: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Titan API CORS Test</h1>
+    <p>Testing from origin: <code id="origin"></code></p>
+    
+    <div id="tests"></div>
+
+    <script>
+        const TOKEN = 'titan-secret-token-change-me-in-production';
+        const TESTS = [
+            { name: 'Memory Service Health', url: 'http://localhost:8001/health', auth: false },
+            { name: 'Memory Service Stats', url: 'http://localhost:8001/memory/stats', auth: true },
+            { name: 'Plugin Manager Health', url: 'http://localhost:8003/health', auth: false },
+            { name: 'Plugin Manager List', url: 'http://localhost:8003/plugins', auth: true },
+            { name: 'Goal Scheduler Health', url: 'http://localhost:8004/health', auth: false },
+            { name: 'Goal Scheduler Goals', url: 'http://localhost:8004/goals', auth: true },
+            { name: 'Model Gateway Health', url: 'http://localhost:8081/health', auth: false },
+            { name: 'Model Gateway Models', url: 'http://localhost:8081/models', auth: false },
+        ];
+
+        document.getElementById('origin').textContent = window.location.origin;
+
+        async function runTest(test) {
+            const div = document.createElement('div');
+            div.className = 'test pending';
+            div.innerHTML = `<h3>${test.name}</h3><p>URL: ${test.url}</p><pre id="result-${test.name.replace(/\s/g, '-')}">Testing...</pre>`;
+            document.getElementById('tests').appendChild(div);
+
+            try {
+                const headers = {};
+                if (test.auth) {
+                    headers['Authorization'] = `Bearer ${TOKEN}`;
+                }
+
+                const response = await fetch(test.url, { headers });
+                const data = await response.json();
+                
+                div.className = 'test success';
+                div.querySelector('pre').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                div.className = 'test error';
+                div.querySelector('pre').textContent = `Error: ${error.message}\n\nThis usually means CORS is not configured.`;
+            }
+        }
+
+        // Run all tests
+        TESTS.forEach(test => runTest(test));
+    </script>
+</body>
+</html>

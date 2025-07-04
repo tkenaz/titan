@@ -231,6 +231,7 @@ class ModelRouter:
         Stream completion response with signatures
         Yields chunks with format: {"chunk": "text", "signature": "...", "seq": N}
         """
+        import time  # Явный импорт внутри функции
         trace_id = trace_id or str(uuid.uuid4())
         start_time = time.time()
         

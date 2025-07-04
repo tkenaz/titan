@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+  }
+  
+  * {
+    @apply border-dark-border;
+  }
+  
+  body {
+    @apply bg-dark-bg text-dark-text antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-bg;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-border rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-titan-700;
+  }
+}
+
+@layer components {
+  /* Card component */
+  .card {
+    @apply bg-dark-card border border-dark-border rounded-lg p-6;
+  }
+  
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-titan-500 disabled:pointer-events-none disabled:opacity-50;
+  }
+  
+  .btn-primary {
+    @apply btn bg-titan-600 text-white hover:bg-titan-700 h-10 px-4 py-2;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-dark-card border border-dark-border hover:bg-dark-border/50 h-10 px-4 py-2;
+  }
+  
+  .btn-ghost {
+    @apply btn hover:bg-dark-card h-10 px-4 py-2;
+  }
+  
+  .btn-icon {
+    @apply btn hover:bg-dark-card h-10 w-10;
+  }
+  
+  /* Input */
+  .input {
+    @apply flex h-10 w-full rounded-md border border-dark-border bg-dark-card px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-dark-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-titan-500 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors;
+  }
+  
+  .badge-success {
+    @apply badge bg-green-500/10 text-green-500;
+  }
+  
+  .badge-warning {
+    @apply badge bg-amber-500/10 text-amber-500;
+  }
+  
+  .badge-error {
+    @apply badge bg-red-500/10 text-red-500;
+  }
+  
+  .badge-info {
+    @apply badge bg-blue-500/10 text-blue-500;
+  }
+}
+
+@layer utilities {
+  /* Animations */
+  .animate-in {
+    animation: animateIn 0.3s ease-out;
+  }
+  
+  @keyframes animateIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Glass effect */
+  .glass {
+    @apply bg-dark-card/50 backdrop-blur-md;
+  }
+  
+  /* Electron titlebar drag area */
+  .titlebar-drag {
+    -webkit-app-region: drag;
+  }
+  
+  .titlebar-no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
